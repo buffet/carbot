@@ -1,6 +1,8 @@
 use discord::model::{ChannelId, Message, MessageId, User};
 use discord::Discord;
 
+use std::{thread, time};
+
 pub struct Command {
     channel_id: ChannelId,
     message_id: MessageId,

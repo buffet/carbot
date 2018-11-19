@@ -1,13 +1,19 @@
 use command::{Command, CommandParseError};
 
-use discord::model::Event;
+use discord::model::{Event, Message};
 use discord::{Connection, Discord, State};
+
+use std::collections::VecDeque;
+use std::thread;
+
+static MAX_MESSAGES: usize = 1000;
 
 pub struct Carbot {
     prefix: String,
     discord: Discord,
     connection: Connection,
     state: State,
+    messages: VecDeque<Message>,
 }
 
 impl Carbot {
@@ -23,6 +29,7 @@ impl Carbot {
             discord: discord,
             connection: connection,
             state: state,
+            messages: VecDeque::new(),
         })
     }
 
@@ -50,6 +57,9 @@ impl Carbot {
 
             match event {
                 Event::MessageCreate(message) => {
+                    self.messages.push_back(message.clone());
+                    self.messages.truncate(MAX_MESSAGES);
+
                     match Command::from_message(&self.prefix, &message) {
                         Ok(command) => command.execute(&self.discord),
                         Err(CommandParseError::NotACommand) => {
@@ -60,6 +70,21 @@ impl Carbot {
                             let _ = self.discord.send_message(
                                 message.channel_id,
                                 &format!("Invalid command, try `{}help`.", self.prefix),
+                                "",
+                                false,
+                            );
+                        }
+                    }
+                }
+                Event::MessageDelete {
+                    channel_id,
+                    message_id,
+                } => {
+                    for message in self.messages.iter() {
+                        if message_id == message.id {
+                            let _ = self.discord.send_message(
+                                channel_id,
+                                &format!("{} deleted: {}", message.author.name, message.content),
                                 "",
                                 false,
                             );
