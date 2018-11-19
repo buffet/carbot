@@ -1,10 +1,7 @@
-use command::{Command, CommandParseError};
-
 use discord::model::{Event, Message};
 use discord::{Connection, Discord, State};
 
 use std::collections::VecDeque;
-use std::thread;
 
 static MAX_MESSAGES: usize = 1000;
 
@@ -14,7 +11,10 @@ pub struct Carbot {
     connection: Connection,
     state: State,
     messages: VecDeque<Message>,
+    commands: Vec<Command>,
 }
+
+struct Command(String, Box<Fn(&Discord, &Message, &Vec<&str>)>);
 
 impl Carbot {
     pub fn new(token: String, prefix: String) -> Result<Self, discord::Error> {
@@ -24,17 +24,29 @@ impl Carbot {
 
         let state = State::new(ready);
 
+        let commands = vec![
+            Command(String::from("ping"), Box::new(move |discord, message, _args| {
+                let _ = discord.send_message(
+                    message.channel_id,
+                    "*Pong!*",
+                    "",
+                    false
+                );
+            })),
+        ];
+
         Ok(Carbot {
             prefix: prefix,
             discord: discord,
             connection: connection,
             state: state,
             messages: VecDeque::new(),
+            commands: commands,
         })
     }
 
     pub fn run(mut self) {
-        loop {
+        'event_loop: loop {
             let event = match self.connection.recv_event() {
                 Ok(event) => event,
                 Err(err) => {
@@ -60,21 +72,31 @@ impl Carbot {
                     self.messages.push_back(message.clone());
                     self.messages.truncate(MAX_MESSAGES);
 
-                    match Command::from_message(&self.prefix, &message) {
-                        Ok(command) => command.execute(&self.discord),
-                        Err(CommandParseError::NotACommand) => {
-                            println!("{}: {}", message.author.name, message.content)
-                        }
-                        Err(CommandParseError::UnknownCommand) => {
-                            eprintln!("Invalid command: {}", message.content);
-                            let _ = self.discord.send_message(
-                                message.channel_id,
-                                &format!("Invalid command, try `{}help`.", self.prefix),
-                                "",
-                                false,
-                            );
+                    eprintln!("{}: {}", message.author.name, message.content);
+
+                    if !message.content.starts_with(&self.prefix) || message.author.bot {
+                        continue;
+                    }
+
+                    let mut split = message.content[self.prefix.len()..].split(" ");
+                    let command = split.next().unwrap_or("");
+                    let arguments: Vec<&str> = split.collect();
+
+                    for cmd in self.commands.iter() {
+                        if &cmd.0 == command {
+                            cmd.1(&self.discord, &message, &arguments);
+                            continue 'event_loop;
                         }
                     }
+
+                    eprintln!("[*] Unknown command: {}", command);
+
+                    let _ = self.discord.send_message(
+                        message.channel_id,
+                        &format!("Unknown command! Try `{}help`.", self.prefix),
+                        "",
+                        false
+                    );
                 }
                 Event::MessageDelete {
                     channel_id,
