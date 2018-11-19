@@ -19,7 +19,11 @@ pub enum CommandParseError {
 
 impl Command {
     pub fn from_message(prefix: &str, message: &Message) -> Result<Self, CommandParseError> {
-        if !message.content.starts_with(prefix) {
+        if !message.content.starts_with(prefix) || message.author.bot {
+            return Err(CommandParseError::NotACommand);
+        }
+
+        if message.author.bot {
             return Err(CommandParseError::NotACommand);
         }
 

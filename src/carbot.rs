@@ -50,10 +50,6 @@ impl Carbot {
 
             match event {
                 Event::MessageCreate(message) => {
-                    if message.author.bot {
-                        continue;
-                    }
-
                     match Command::from_message(&self.prefix, &message) {
                         Ok(command) => command.execute(&self.discord),
                         Err(CommandParseError::NotACommand) => {
