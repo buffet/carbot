@@ -1,0 +1,6 @@
+[package]
+name = "carbot"
+version = "0.1.0"
+authors = ["buffet <niclas@countingsort.com>"]
+
+[dependencies]
