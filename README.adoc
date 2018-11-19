@@ -1,0 +1,9 @@
+carbot
+======
+
+Healthy Discord bot for your eyes
+
+Usage
+-----
+
+Make sure `DISCORD_TOKEN` is set in the environment and then just `cargo run`. The standard prefix is `./`, but can be changed via the `DISCORD_PREFIX` variable.
