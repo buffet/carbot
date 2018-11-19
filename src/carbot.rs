@@ -50,13 +50,16 @@ impl Carbot {
 
             match event {
                 Event::MessageCreate(message) => {
+                    if message.author.bot {
+                        continue;
+                    }
+
                     match Command::from_message(&self.prefix, &message) {
-                        Ok(command) => command.execute(),
+                        Ok(command) => command.execute(&self.discord),
                         Err(CommandParseError::NotACommand) => {
                             println!("{}: {}", message.author.name, message.content)
                         }
-                        Err(CommandParseError::UnknownCommand)
-                        | Err(CommandParseError::InvalidArgument) => {
+                        Err(CommandParseError::UnknownCommand) => {
                             eprintln!("Invalid command: {}", message.content);
                             let _ = self.discord.send_message(
                                 message.channel_id,
