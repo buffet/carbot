@@ -1,6 +1,7 @@
 extern crate discord;
 
 mod carbot;
+mod command;
 
 use carbot::Carbot;
 

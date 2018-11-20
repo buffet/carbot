@@ -1,3 +1,5 @@
+use command::CommandReply;
+
 use discord::model::{ChannelId, Event, Message, UserId};
 use discord::{Connection, Discord, State};
 
@@ -15,7 +17,10 @@ pub struct Carbot {
     owner: UserId,
 }
 
-struct Command(String, Box<Fn(&Carbot, &Message, &Vec<&str>)>);
+struct Command(
+    String,
+    Box<Fn(&Carbot, &Message, &Vec<&str>) -> CommandReply>,
+);
 
 impl Carbot {
     pub fn new(owner_id: UserId, token: String, prefix: String) -> Result<Self, discord::Error> {
@@ -28,51 +33,38 @@ impl Carbot {
         let commands = vec![
             Command(
                 String::from("ping"),
-                Box::new(move |bot, message, _args| {
-                    let _ = bot
-                        .discord
-                        .send_message(message.channel_id, "*Pong!*", "", false);
+                Box::new(move |_bot, message, _args| {
+                    CommandReply::Message(message.channel_id, String::from("*Pong*!"))
                 }),
             ),
             Command(
                 String::from("send"),
                 Box::new(move |bot, message, args| {
                     if bot.owner != message.author.id {
-                        let _ = bot.discord.send_message(
+                        return CommandReply::Message(
                             message.channel_id,
-                            "You don't have access to that command!",
-                            "",
-                            false,
+                            String::from("You don't have access to that command!"),
                         );
-                        return;
                     }
 
                     if args.len() < 2 {
-                        let _ = bot.discord.send_message(
+                        return CommandReply::Message(
                             message.channel_id,
-                            &format!("Not enough arguments.\nUsage: `send <channel_id> <message>`"),
-                            "",
-                            false,
+                            format!("Not enough arguments.\nUsage: `send <channel_id> <message>`"),
                         );
-                        return;
                     }
 
                     let channel_id = match args[0].parse::<u64>() {
                         Ok(val) => ChannelId(val),
                         Err(_) => {
-                            let _ = bot.discord.send_message(
+                            return CommandReply::Message(
                                 message.channel_id,
-                                "Please give a valid channel id!",
-                                "",
-                                false,
+                                String::from("Please give a valid channel id!"),
                             );
-                            return;
                         }
                     };
 
-                    let _ = bot
-                        .discord
-                        .send_message(channel_id, &args[1..].join(" "), "", false);
+                    return CommandReply::Message(channel_id, args[1..].join(" "));
                 }),
             ),
         ];
@@ -127,7 +119,11 @@ impl Carbot {
 
                     for cmd in self.commands.iter() {
                         if &cmd.0 == command {
-                            cmd.1(&self, &message, &arguments);
+                            match cmd.1(&self, &message, &arguments) {
+                                CommandReply::Message(channel_id, text) => {
+                                    let _ = self.discord.send_message(channel_id, &text, "", false);
+                                }
+                            }
                             continue 'event_loop;
                         }
                     }
