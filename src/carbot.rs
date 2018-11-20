@@ -1,4 +1,4 @@
-use discord::model::{Event, Message};
+use discord::model::{ChannelId, Event, Message, UserId};
 use discord::{Connection, Discord, State};
 
 use std::collections::VecDeque;
@@ -12,12 +12,13 @@ pub struct Carbot {
     state: State,
     messages: VecDeque<Message>,
     commands: Vec<Command>,
+    owner: UserId,
 }
 
-struct Command(String, Box<Fn(&Discord, &Message, &Vec<&str>)>);
+struct Command(String, Box<Fn(&Carbot, &Message, &Vec<&str>)>);
 
 impl Carbot {
-    pub fn new(token: String, prefix: String) -> Result<Self, discord::Error> {
+    pub fn new(owner_id: UserId, token: String, prefix: String) -> Result<Self, discord::Error> {
         let discord = Discord::from_bot_token(token.as_ref())?;
 
         let (connection, ready) = discord.connect()?;
@@ -25,14 +26,55 @@ impl Carbot {
         let state = State::new(ready);
 
         let commands = vec![
-            Command(String::from("ping"), Box::new(move |discord, message, _args| {
-                let _ = discord.send_message(
-                    message.channel_id,
-                    "*Pong!*",
-                    "",
-                    false
-                );
-            })),
+            Command(
+                String::from("ping"),
+                Box::new(move |bot, message, _args| {
+                    let _ = bot
+                        .discord
+                        .send_message(message.channel_id, "*Pong!*", "", false);
+                }),
+            ),
+            Command(
+                String::from("send"),
+                Box::new(move |bot, message, args| {
+                    if bot.owner != message.author.id {
+                        let _ = bot.discord.send_message(
+                            message.channel_id,
+                            "You don't have access to that command!",
+                            "",
+                            false,
+                        );
+                        return;
+                    }
+
+                    if args.len() < 2 {
+                        let _ = bot.discord.send_message(
+                            message.channel_id,
+                            &format!("Not enough arguments.\nUsage: `send <channel_id> <message>`"),
+                            "",
+                            false,
+                        );
+                        return;
+                    }
+
+                    let channel_id = match args[0].parse::<u64>() {
+                        Ok(val) => ChannelId(val),
+                        Err(_) => {
+                            let _ = bot.discord.send_message(
+                                message.channel_id,
+                                "Please give a valid channel id!",
+                                "",
+                                false,
+                            );
+                            return;
+                        }
+                    };
+
+                    let _ = bot
+                        .discord
+                        .send_message(channel_id, &args[1..].join(" "), "", false);
+                }),
+            ),
         ];
 
         Ok(Carbot {
@@ -42,6 +84,7 @@ impl Carbot {
             state: state,
             messages: VecDeque::new(),
             commands: commands,
+            owner: owner_id,
         })
     }
 
@@ -84,7 +127,7 @@ impl Carbot {
 
                     for cmd in self.commands.iter() {
                         if &cmd.0 == command {
-                            cmd.1(&self.discord, &message, &arguments);
+                            cmd.1(&self, &message, &arguments);
                             continue 'event_loop;
                         }
                     }
@@ -95,7 +138,7 @@ impl Carbot {
                         message.channel_id,
                         &format!("Unknown command! Try `{}help`.", self.prefix),
                         "",
-                        false
+                        false,
                     );
                 }
                 Event::MessageDelete {
