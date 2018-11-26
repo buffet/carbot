@@ -34,7 +34,7 @@ impl Carbot {
             Command(
                 String::from("ping"),
                 Box::new(move |_bot, message, _args| {
-                    CommandReply::Message(message.channel_id, String::from("*Pong*!"))
+                    CommandReply::Message(message.channel_id, String::from("*Pong!*"))
                 }),
             ),
             Command(
@@ -65,6 +65,12 @@ impl Carbot {
                     };
 
                     return CommandReply::Message(channel_id, args[1..].join(" "));
+                }),
+            ),
+            Command(
+                String::from("help"),
+                Box::new(move |_bot, message, _args| {
+                    CommandReply::Message(message.channel_id, String::from("Help yourself!"))
                 }),
             ),
         ];
