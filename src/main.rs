@@ -53,7 +53,7 @@ fn main() {
                     .on_mention(true)
                     .prefix(&prefix)
                     .case_insensitivity(true)
-            }).command("ping", |c| c.cmd(commands::small::ping)),
+            }).command("ping", |c| c.cmd(commands::misc::ping)),
     );
 
     if let Err(err) = client.start() {
